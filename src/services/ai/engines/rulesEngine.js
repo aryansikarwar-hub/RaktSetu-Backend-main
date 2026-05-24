@@ -73,6 +73,7 @@ export function matchDonors(request, donors = []) {
       return {
         donorId: d._id || d.id,
         name: d.name,
+        phone: d.phone || null,
         bloodType: d.bloodType,
         city: d.city,
         distanceKm,
