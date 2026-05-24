@@ -18,8 +18,8 @@ export const env = {
   AI_MODE: (process.env.AI_MODE || 'rules').toLowerCase(),
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
-  ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+  GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
 };
 
 export const isProd = env.NODE_ENV === 'production';

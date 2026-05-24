@@ -6,7 +6,7 @@
  *  WHY THIS EXISTS
  *  The whole app talks to AI through ONE interface (`ai`). Today it runs a
  *  fast, free, deterministic *rule-based* engine. Tomorrow you flip
- *  AI_MODE=openai or AI_MODE=anthropic in .env, drop in an API key, and every
+ *  AI_MODE=openai or AI_MODE=gemini in .env, drop in an API key, and every
  *  feature (donor match, eligibility chat, forecasting, triage) upgrades to a
  *  real LLM — WITHOUT touching controllers, routes, or the frontend.
  *
@@ -15,7 +15,7 @@
  *  future-proof.
  *
  *  To add a real LLM later you only implement the `llm.complete()` call inside
- *  the openai/anthropic branches below — the rule engines already define the
+ *  the openai/gemini branches below — the rule engines already define the
  *  exact JSON shape the rest of the app expects, so you can even use them as
  *  the LLM's response schema / validation fallback.
  */
@@ -25,15 +25,15 @@ import * as rules from './engines/rulesEngine.js';
 import * as chatRag from './engines/chatRagEngine.js';
 // LLM adapters are imported lazily so the app runs with zero AI deps installed.
 
-const MODE = env.AI_MODE; // 'rules' | 'openai' | 'anthropic'
+const MODE = env.AI_MODE; // 'rules' | 'openai' | 'gemini'
 
 let llmAdapter = null;
 async function getLLM() {
   if (llmAdapter) return llmAdapter;
   if (MODE === 'openai') {
     llmAdapter = await import('./engines/openaiEngine.js');
-  } else if (MODE === 'anthropic') {
-    llmAdapter = await import('./engines/anthropicEngine.js');
+  } else if (MODE === 'gemini') {
+    llmAdapter = await import('./engines/geminiEngine.js');
   }
   return llmAdapter;
 }
