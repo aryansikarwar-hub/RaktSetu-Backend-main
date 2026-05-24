@@ -1,68 +1,73 @@
 /**
- * OPENAI ENGINE ADAPTER  (active when AI_MODE=openai)
+ * GOOGLE GEMINI ENGINE ADAPTER  (active when AI_MODE=gemini)
  * ───────────────────────────────────────────────────────────────────────────
- * This adapter calls the OpenAI Chat Completions API directly over `fetch`
- * (built into Node 18+), so it needs NO extra npm packages. Just:
- *   1) set AI_MODE=openai and OPENAI_API_KEY=sk-... in .env
- *   2) (optional) set OPENAI_MODEL (default gpt-4o-mini)
+ * Calls the Google Generative Language API (Gemini) directly over `fetch`
+ * (Node 18+), so it needs NO extra npm packages. Just:
+ *   1) set AI_MODE=gemini and GEMINI_API_KEY=... in .env
+ *   2) (optional) set GEMINI_MODEL (default gemini-1.5-flash)
  *   3) restart the server
  *
- * Every function returns the SAME JSON shape as the rules engine, and if the
- * API key is missing or any request fails, it transparently falls back to the
- * deterministic rule engine — the app NEVER breaks.
+ * Get a free API key at: https://aistudio.google.com/app/apikey
+ *
+ * Returns the SAME JSON shape as the rules engine, and if the key is missing or
+ * any request fails, it transparently falls back to the deterministic rule
+ * engine — the app NEVER breaks.
  */
 import { env } from '../../../config/env.js';
 import { logger } from '../../../utils/logger.js';
 import * as rules from './rulesEngine.js';
 import { KNOWLEDGE_BASE } from '../knowledgeBase.js';
 
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 function hasKey() {
-  return Boolean(env.OPENAI_API_KEY && env.OPENAI_API_KEY.trim());
+  return Boolean(env.GEMINI_API_KEY && env.GEMINI_API_KEY.trim());
 }
 
 /**
- * Low-level call to OpenAI. `wantJson` asks the model to return strict JSON.
- * Throws on any failure so callers can fall back to rules.
+ * Low-level call to Gemini. `wantJson` asks the model to return strict JSON.
+ * `history` is optional prior chat turns. Throws on any failure so callers can
+ * fall back to rules.
  */
 async function complete(system, user, { wantJson = false, history = [] } = {}) {
-  if (!hasKey()) throw new Error('OPENAI_API_KEY is not set');
+  if (!hasKey()) throw new Error('GEMINI_API_KEY is not set');
 
-  const messages = [{ role: 'system', content: system }];
-  // Optional prior conversation turns (used by chat).
+  // Gemini uses "contents" with roles "user" / "model". The system instruction
+  // is passed separately via system_instruction.
+  const contents = [];
   for (const h of history) {
-    const role = h.role === 'user' ? 'user' : 'assistant';
-    const content = h.text || h.content || '';
-    if (content) messages.push({ role, content });
+    const role = h.role === 'user' ? 'user' : 'model';
+    const text = h.text || h.content || '';
+    if (text) contents.push({ role, parts: [{ text }] });
   }
-  messages.push({ role: 'user', content: user });
+  contents.push({ role: 'user', parts: [{ text: user }] });
 
   const body = {
-    model: env.OPENAI_MODEL,
-    messages,
-    temperature: wantJson ? 0.2 : 0.5,
-    max_tokens: 700,
-  };
-  if (wantJson) body.response_format = { type: 'json_object' };
-
-  const res = await fetch(OPENAI_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+    system_instruction: { parts: [{ text: system }] },
+    contents,
+    generationConfig: {
+      temperature: wantJson ? 0.2 : 0.5,
+      maxOutputTokens: 700,
+      ...(wantJson ? { responseMimeType: 'application/json' } : {}),
     },
+  };
+
+  const url = `${GEMINI_BASE}/${env.GEMINI_MODEL}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    throw new Error(`OpenAI API ${res.status}: ${errText.slice(0, 200)}`);
+    throw new Error(`Gemini API ${res.status}: ${errText.slice(0, 200)}`);
   }
 
   const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content || '';
-  if (!text) throw new Error('OpenAI returned an empty response');
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  if (!text) throw new Error('Gemini returned an empty response');
   return text;
 }
 
@@ -72,10 +77,8 @@ function parseJson(text) {
   return JSON.parse(clean);
 }
 
-/* ── Donor matching: let the LLM re-rank, validated against the rules shape ── */
+/* ── Donor matching: keep deterministic (latency-sensitive, rules are strong) ── */
 export async function matchDonors(request, donors) {
-  // Donor matching is latency-sensitive and the rules engine is already strong;
-  // keep it deterministic unless you specifically want LLM re-ranking.
   return rules.matchDonors(request, donors);
 }
 
@@ -91,14 +94,13 @@ export async function screenEligibility(answers) {
     // Merge with rules result to guarantee all expected fields exist.
     return { ...rules.screenEligibility(answers), ...out };
   } catch (err) {
-    logger.warn(`openai.screenEligibility fell back to rules: ${err.message}`);
+    logger.warn(`gemini.screenEligibility fell back to rules: ${err.message}`);
     return rules.screenEligibility(answers);
   }
 }
 
-/* ── Demand forecasting ── */
+/* ── Demand forecasting (numeric/statistical → keep deterministic) ── */
 export async function forecastDemand(city, history) {
-  // Forecasting is numeric/statistical; the rules engine is reliable here.
   return rules.forecastDemand(city, history);
 }
 
@@ -132,10 +134,10 @@ export async function chat(question, context = {}) {
       answer: answer.trim(),
       sources: [],
       usedLive: liveFacts.length > 0,
-      engine: 'openai',
+      engine: 'gemini',
     };
   } catch (err) {
-    logger.warn(`openai.chat fell back to rules-rag: ${err.message}`);
+    logger.warn(`gemini.chat fell back to rules-rag: ${err.message}`);
     const rag = await import('./chatRagEngine.js');
     return rag.chat(question, context);
   }
