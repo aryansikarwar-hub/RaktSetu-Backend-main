@@ -135,3 +135,51 @@ export async function chat(question, context = {}) {
     return rag.chat(question, context);
   }
 }
+
+/* ── Emergency description writer (LLM) ─────────────────────────────────────*/
+export async function writeEmergencyDescription(details = {}) {
+  try {
+    const system =
+      'You write short, professional blood-emergency descriptions for an Indian blood-donation app. ' +
+      'Given structured fields, produce ONE clear, urgent, compassionate sentence (max 2 sentences) that a hospital would post to alert donors. ' +
+      'No markdown, no preamble — just the description text.';
+    const user = `Fields (JSON): ${JSON.stringify(details)}`;
+    const description = (await complete(system, user)).trim();
+    return { description, engine: 'groq' };
+  } catch (err) {
+    logger.warn(`groq.writeEmergencyDescription fell back to rules: ${err.message}`);
+    return rules.writeEmergencyDescription(details);
+  }
+}
+
+/* ── Donor outreach message writer (LLM) ────────────────────────────────────*/
+export async function writeOutreachMessage(donor = {}, request = {}) {
+  try {
+    const system =
+      'You write short, warm, personalized WhatsApp messages asking a blood donor to help with an urgent request in India. ' +
+      'Be respectful and motivating, mention their first name and the hospital/city, keep it under 50 words, and end with gratitude. ' +
+      'No markdown, no preamble — just the message text.';
+    const user = `Donor (JSON): ${JSON.stringify(donor)}\nRequest (JSON): ${JSON.stringify(request)}`;
+    const message = (await complete(system, user)).trim();
+    return { message, engine: 'groq' };
+  } catch (err) {
+    logger.warn(`groq.writeOutreachMessage fell back to rules: ${err.message}`);
+    return rules.writeOutreachMessage(donor, request);
+  }
+}
+
+/* ── Conversational eligibility (LLM) ───────────────────────────────────────*/
+export async function eligibilityChat(message, history = []) {
+  try {
+    const system =
+      'You are a friendly blood-donation eligibility assistant for India. The user describes their situation in plain language. ' +
+      'Assess whether they can likely donate, ask a brief follow-up if key info is missing (age, weight, last donation, recent illness/tattoo/surgery/pregnancy/medication/alcohol). ' +
+      'Use Indian blood-bank norms (age 18-65, weight >=50kg, 90-day gap for whole blood, defer for recent illness/tattoo/pregnancy). ' +
+      'Be warm, concise (2-4 sentences), and ALWAYS end with "Informational only — not medical advice." Never give a hard medical diagnosis.';
+    const answer = await complete(system, message, { history });
+    return { answer: answer.trim(), engine: 'groq' };
+  } catch (err) {
+    logger.warn(`groq.eligibilityChat fell back to rules: ${err.message}`);
+    return rules.eligibilityChat(message, history);
+  }
+}

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body, query } from 'express-validator';
-import { screenEligibility, forecast, matchAdhoc, status, chat, chatSuggestions } from '../controllers/aiController.js';
+import { screenEligibility, forecast, matchAdhoc, status, chat, chatSuggestions, describeEmergency, outreachMessage, eligibilityChat } from '../controllers/aiController.js';
 import { validate } from '../middleware/validate.js';
 import { BLOOD_TYPES } from '../utils/bloodLogic.js';
 
@@ -44,6 +44,22 @@ router.post(
   [body('message').trim().notEmpty().withMessage('Message is required').isLength({ max: 500 }).withMessage('Message too long')],
   validate,
   chat
+);
+
+router.post(
+  '/describe-emergency',
+  [body('bloodType').optional().isString(), body('units').optional().isInt({ min: 1, max: 50 })],
+  validate,
+  describeEmergency
+);
+
+router.post('/outreach', outreachMessage);
+
+router.post(
+  '/eligibility-chat',
+  [body('message').trim().notEmpty().withMessage('Message is required').isLength({ max: 500 })],
+  validate,
+  eligibilityChat
 );
 
 export default router;

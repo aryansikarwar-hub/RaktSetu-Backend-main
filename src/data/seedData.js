@@ -1,38 +1,257 @@
-/** Realistic seed data for India. Used by both the seed script and mock store. */
-import { cityCoords } from '../utils/geo.js';
+/**
+ * SEED DATA — realistic, bulk demo data for RaktSetu.
+ * Generated programmatically so you get LOTS of natural-looking records:
+ *   - donors, hospital-staff, admins (all can log in)
+ *   - hospitals with blood inventory
+ *   - active emergencies
+ *
+ * Tune the counts in CONFIG below. Run `npm run seed` (needs USE_MOCK=false
+ * and a valid MONGO_URI) to insert everything into MongoDB.
+ *
+ * Every generated account uses the password: password123
+ */
+import { BLOOD_TYPES } from '../utils/bloodLogic.js';
 
-const coord = (city) => ({ type: 'Point', coordinates: cityCoords(city) || [0, 0] });
+// ── How much data to generate ─────────────────────────────────────────────
+const CONFIG = {
+  donors: 200,       // blood donors (user accounts)
+  hospitals: 200,    // hospitals (each gets one hospital-role login)
+  admins: 5,         // network admins — kept small because real networks have few
+  emergencies: 40,   // active emergency requests
+};
 
+// ── Real Indian cities with [lng, lat] coordinates ────────────────────────
+const CITIES = [
+  { city: 'Mumbai',     coords: [72.8777, 19.0760] },
+  { city: 'Delhi',      coords: [77.1025, 28.7041] },
+  { city: 'Bengaluru',  coords: [77.5946, 12.9716] },
+  { city: 'Hyderabad',  coords: [78.4867, 17.3850] },
+  { city: 'Chennai',    coords: [80.2707, 13.0827] },
+  { city: 'Kolkata',    coords: [88.3639, 22.5726] },
+  { city: 'Pune',       coords: [73.8567, 18.5204] },
+  { city: 'Ahmedabad',  coords: [72.5714, 23.0225] },
+  { city: 'Jaipur',     coords: [75.7873, 26.9124] },
+  { city: 'Indore',     coords: [75.8577, 22.7196] },
+  { city: 'Lucknow',    coords: [80.9462, 26.8467] },
+  { city: 'Bhopal',     coords: [77.4126, 23.2599] },
+];
+
+const FIRST_NAMES = [
+  'Arjun', 'Priya', 'Rohan', 'Sneha', 'Vikram', 'Ananya', 'Karan', 'Pooja',
+  'Aditya', 'Riya', 'Sahil', 'Neha', 'Rahul', 'Divya', 'Amit', 'Kavya',
+  'Siddharth', 'Meera', 'Varun', 'Isha', 'Nikhil', 'Tanvi', 'Aryan', 'Shreya',
+  'Manish', 'Aishwarya', 'Raj', 'Sanya', 'Dev', 'Nisha', 'Harsh', 'Pallavi',
+  'Yash', 'Simran', 'Akash', 'Ritika', 'Gaurav', 'Anjali', 'Kunal', 'Swati',
+  'Abhishek', 'Deepika', 'Sanjay', 'Komal', 'Vivek', 'Preeti', 'Naveen', 'Sunita',
+  'Rakesh', 'Geeta', 'Sandeep', 'Madhuri', 'Ashish', 'Rekha', 'Tarun', 'Bhavna',
+  'Imran', 'Fatima', 'Suresh', 'Lakshmi', 'Manoj', 'Simi', 'Ravi', 'Jyoti',
+];
+const LAST_NAMES = [
+  'Sharma', 'Verma', 'Patel', 'Reddy', 'Nair', 'Gupta', 'Mehta', 'Singh',
+  'Iyer', 'Joshi', 'Kapoor', 'Rao', 'Desai', 'Chopra', 'Malhotra', 'Bose',
+  'Pillai', 'Agarwal', 'Bhatt', 'Menon', 'Saxena', 'Chauhan', 'Nadar', 'Banerjee',
+  'Khan', 'Das', 'Mukherjee', 'Naidu', 'Trivedi', 'Shetty', 'Kulkarni', 'Pandey',
+  'Mishra', 'Sinha', 'Ghosh', 'Bhatia', 'Chakraborty', 'Yadav', 'Jain', 'Dube',
+];
+
+const TIERS = ['Bronze', 'Silver', 'Gold', 'Platinum'];
+
+// Deterministic-ish PRNG helpers (so reruns vary a bit but stay realistic)
+const rand = (n) => Math.floor(Math.random() * n);
+const pick = (arr) => arr[rand(arr.length)];
+const phone = () => `+91 ${90 + rand(10)}${rand(10)}${rand(10)}${rand(10)}${rand(10)} ${rand(10)}${rand(10)}${rand(10)}${rand(10)}${rand(10)}`;
+// jitter coordinates slightly so donors aren't all on one pixel
+const jitter = ([lng, lat]) => [lng + (Math.random() - 0.5) * 0.15, lat + (Math.random() - 0.5) * 0.15];
+
+function daysAgo(d) {
+  const dt = new Date();
+  dt.setDate(dt.getDate() - d);
+  return dt.toISOString().slice(0, 10);
+}
+
+// ── DONORS ────────────────────────────────────────────────────────────────
+function buildDonors() {
+  const out = [];
+  for (let i = 0; i < CONFIG.donors; i++) {
+    const first = pick(FIRST_NAMES);
+    const last = pick(LAST_NAMES);
+    const loc = pick(CITIES);
+    const total = rand(15);
+    const tier = total >= 10 ? 'Platinum' : total >= 5 ? 'Gold' : total >= 2 ? 'Silver' : 'Bronze';
+    const lastDon = total > 0 ? daysAgo(rand(180)) : null;
+    out.push({
+      name: `${first} ${last}`,
+      email: `${first.toLowerCase()}.${last.toLowerCase()}${i}@raktsetu.in`,
+      password: 'password123',
+      role: 'donor',
+      bloodType: pick(BLOOD_TYPES),
+      city: loc.city,
+      phone: phone(),
+      donorStatus: Math.random() > 0.2 ? 'active' : 'inactive',
+      available: Math.random() > 0.25,
+      lastDonation: lastDon,
+      totalDonations: total,
+      points: total * 100,
+      tier,
+      reliability: 70 + rand(30),
+      verified: Math.random() > 0.15,
+      location: { type: 'Point', coordinates: jitter(loc.coords) },
+    });
+  }
+  return out;
+}
+
+// ── HOSPITALS + matching hospital-staff logins ───────────────────────────
+// Build many realistic, unique hospital names by combining real chains/brands
+// with city localities, so 200 hospitals all look genuine.
+const HOSPITAL_BRANDS = [
+  'Apollo Hospital', 'Fortis Healthcare', 'Kokilaben Dhirubhai Ambani Hospital',
+  'Lilavati Hospital', 'AIIMS', 'Manipal Hospital', 'Max Super Speciality Hospital',
+  'Narayana Health', 'Medanta', 'Ruby Hall Clinic', 'CARE Hospital', 'Columbia Asia',
+  'Wockhardt Hospital', 'Jaslok Hospital', 'Hinduja Hospital', 'Sir Ganga Ram Hospital',
+  'BLK-Max Hospital', 'Sterling Hospital', 'KIMS Hospital', 'Rainbow Children Hospital',
+  'Global Hospital', 'Yashoda Hospital', 'Care Wellness Centre', 'Sunshine Hospital',
+];
+const LOCALITIES = [
+  'Andheri', 'Bandra', 'Powai', 'Whitefield', 'Koramangala', 'Banjara Hills',
+  'Salt Lake', 'Anna Nagar', 'Vasant Kunj', 'Hadapsar', 'Satellite', 'Malviya Nagar',
+  'Gomti Nagar', 'Arera Colony', 'Vijay Nagar', 'Jubilee Hills', 'Velachery',
+  'Rajouri Garden', 'Kalyani Nagar', 'Navrangpura',
+];
+
+function buildHospitals() {
+  const out = [];
+  const used = new Set();
+  for (let i = 0; i < CONFIG.hospitals; i++) {
+    const loc = pick(CITIES);
+    const brand = pick(HOSPITAL_BRANDS);
+    const area = pick(LOCALITIES);
+    let name = `${brand}, ${area}, ${loc.city}`;
+    // ensure uniqueness
+    if (used.has(name)) name = `${brand}, ${area}, ${loc.city} #${i}`;
+    used.add(name);
+    const inventory = BLOOD_TYPES.map((bt) => ({ bloodType: bt, units: 5 + rand(120) }));
+    out.push({
+      name,
+      city: loc.city,
+      address: `${100 + rand(900)} ${area} Road, ${loc.city}`,
+      phone: phone(),
+      beds: 80 + rand(900),
+      hasBloodBank: Math.random() > 0.1,
+      verified: Math.random() > 0.1,
+      location: { type: 'Point', coordinates: jitter(loc.coords) },
+      inventory,
+    });
+  }
+  return out;
+}
+
+// One hospital-staff login per hospital (so each hospital has an account).
+function buildHospitalStaff(hospitals) {
+  const out = [];
+  for (let i = 0; i < hospitals.length; i++) {
+    const h = hospitals[i];
+    const first = pick(FIRST_NAMES);
+    const last = pick(LAST_NAMES);
+    out.push({
+      name: `Dr. ${first} ${last}`,
+      email: `hospital${i}@raktsetu.in`,
+      password: 'password123',
+      role: 'hospital',
+      city: h.city,
+      phone: phone(),
+      hospitalName: h.name,
+      licenseNumber: `BLB-${h.city.slice(0, 3).toUpperCase()}-${1000 + i}`,
+      designation: pick(['Blood Bank Officer', 'Transfusion Lead', 'Lab Coordinator', 'Medical Superintendent']),
+      verified: true,
+      location: { type: 'Point', coordinates: h.location.coordinates },
+    });
+  }
+  return out;
+}
+
+// ── ADMINS ────────────────────────────────────────────────────────────────
+function buildAdmins() {
+  const out = [];
+  for (let i = 0; i < CONFIG.admins; i++) {
+    const first = pick(FIRST_NAMES);
+    const last = pick(LAST_NAMES);
+    out.push({
+      name: `${first} ${last}`,
+      email: `admin${i}@raktsetu.in`,
+      password: 'password123',
+      role: 'admin',
+      city: pick(CITIES).city,
+      phone: phone(),
+      verified: true,
+    });
+  }
+  return out;
+}
+
+// ── EMERGENCIES ────────────────────────────────────────────────────────────
+function buildEmergencies() {
+  const out = [];
+  const urgencies = ['critical', 'urgent', 'moderate'];
+  const reasons = [
+    'Post-accident trauma, urgent surgery',
+    'Major surgery scheduled, blood reserve needed',
+    'Severe anaemia, transfusion required',
+    'Childbirth complication',
+    'Dengue with low platelets',
+    'Cancer patient, ongoing therapy',
+  ];
+  for (let i = 0; i < CONFIG.emergencies; i++) {
+    const loc = pick(CITIES);
+    const hname = pick(HOSPITAL_BRANDS);
+    const first = pick(FIRST_NAMES);
+    const last = pick(LAST_NAMES);
+    out.push({
+      bloodType: pick(BLOOD_TYPES),
+      units: 1 + rand(8),
+      urgency: pick(urgencies),
+      hospital: `${hname}, ${loc.city}`,
+      city: loc.city,
+      ward: pick(['ICU', 'Emergency', 'Surgery', 'Trauma', 'Maternity']),
+      contactName: `Dr. ${first} ${last}`,
+      contactPhone: phone(),
+      patientAge: 5 + rand(80),
+      patientGender: pick(['Male', 'Female']),
+      reason: pick(reasons),
+      status: 'open',
+      respondersCount: rand(6),
+    });
+  }
+  return out;
+}
+
+// Generate hospitals first, so each hospital-staff login maps to a real hospital.
+export const seedHospitals = buildHospitals();
+
+// A few guaranteed easy-to-remember login accounts at the front of each list,
+// then the bulk generated data after them.
 export const seedUsers = [
-  { name: 'Arjun Sharma', email: 'arjun@raktsetu.in', password: 'password123', role: 'donor', bloodType: 'O+', city: 'Mumbai', phone: '+91 98765 43210', donorStatus: 'active', available: true, lastDonation: '2026-02-14', totalDonations: 7, points: 700, tier: 'Gold', reliability: 92, verified: true, location: coord('Mumbai') },
-  { name: 'Dr. Priya Menon', email: 'admin@raktsetu.in', password: 'password123', role: 'admin', bloodType: 'A+', city: 'Bangalore', phone: '+91 99887 65432', donorStatus: 'active', available: true, lastDonation: '2026-01-20', totalDonations: 4, points: 400, tier: 'Silver', reliability: 88, verified: true, location: coord('Bangalore') },
-  { name: 'Rahul Verma', email: 'rahul@raktsetu.in', password: 'password123', role: 'donor', bloodType: 'O-', city: 'Delhi', phone: '+91 98111 22334', donorStatus: 'active', available: true, lastDonation: '2025-11-02', totalDonations: 12, points: 1240, tier: 'Platinum', reliability: 97, verified: true, location: coord('Delhi') },
-  { name: 'Sneha Iyer', email: 'sneha@raktsetu.in', password: 'password123', role: 'donor', bloodType: 'B+', city: 'Mumbai', phone: '+91 90000 11223', donorStatus: 'active', available: true, lastDonation: '2026-03-01', totalDonations: 3, points: 300, tier: 'Silver', reliability: 80, verified: true, location: coord('Mumbai') },
-  { name: 'Vikram Singh', email: 'vikram@raktsetu.in', password: 'password123', role: 'donor', bloodType: 'A-', city: 'Delhi', phone: '+91 90111 44556', donorStatus: 'active', available: true, lastDonation: null, totalDonations: 0, points: 0, tier: 'Bronze', reliability: 75, verified: false, location: coord('Delhi') },
-  { name: 'Ananya Reddy', email: 'ananya@raktsetu.in', password: 'password123', role: 'coordinator', bloodType: 'AB+', city: 'Hyderabad', phone: '+91 91234 55667', donorStatus: 'active', available: true, lastDonation: '2025-12-15', totalDonations: 6, points: 620, tier: 'Gold', reliability: 90, verified: true, location: coord('Hyderabad') },
-  { name: 'Karthik Nair', email: 'karthik@raktsetu.in', password: 'password123', role: 'donor', bloodType: 'O+', city: 'Chennai', phone: '+91 93456 77889', donorStatus: 'active', available: true, lastDonation: '2026-04-10', totalDonations: 5, points: 510, tier: 'Gold', reliability: 85, verified: true, location: coord('Chennai') },
-  { name: 'Meera Joshi', email: 'meera@raktsetu.in', password: 'password123', role: 'donor', bloodType: 'B-', city: 'Pune', phone: '+91 94567 88990', donorStatus: 'active', available: false, lastDonation: '2026-05-01', totalDonations: 2, points: 200, tier: 'Bronze', reliability: 70, verified: true, location: coord('Pune') },
-  { name: 'Aditya Kumar', email: 'aditya@raktsetu.in', password: 'password123', role: 'donor', bloodType: 'AB-', city: 'Indore', phone: '+91 95678 99001', donorStatus: 'active', available: true, lastDonation: '2025-10-20', totalDonations: 9, points: 940, tier: 'Platinum', reliability: 95, verified: true, location: coord('Indore') },
-  { name: 'Pooja Desai', email: 'pooja@raktsetu.in', password: 'password123', role: 'donor', bloodType: 'O-', city: 'Mumbai', phone: '+91 96789 00112', donorStatus: 'active', available: true, lastDonation: '2026-01-05', totalDonations: 8, points: 820, tier: 'Gold', reliability: 91, verified: true, location: coord('Mumbai') },
+  {
+    name: 'Arjun Sharma', email: 'arjun@raktsetu.in', password: 'password123',
+    role: 'donor', bloodType: 'O+', city: 'Mumbai', phone: '+91 98765 43210',
+    donorStatus: 'active', available: true, lastDonation: '2026-02-14',
+    totalDonations: 7, points: 700, tier: 'Gold', reliability: 92, verified: true,
+    location: { type: 'Point', coordinates: [72.8777, 19.0760] },
+  },
+  {
+    name: 'Dr. Meera Iyer', email: 'hospital@raktsetu.in', password: 'password123',
+    role: 'hospital', city: 'Mumbai', phone: '+91 98200 11122',
+    hospitalName: 'Apollo Hospital, Andheri, Mumbai', licenseNumber: 'BLB-MUM-0001',
+    designation: 'Blood Bank Officer', verified: true,
+    location: { type: 'Point', coordinates: [72.8777, 19.0760] },
+  },
+  {
+    name: 'Rajesh Khanna', email: 'admin@raktsetu.in', password: 'password123',
+    role: 'admin', city: 'Delhi', phone: '+91 99100 33344', verified: true,
+  },
+  ...buildDonors(),
+  ...buildHospitalStaff(seedHospitals),
+  ...buildAdmins(),
 ];
 
-export const seedHospitals = [
-  { name: 'AIIMS New Delhi', city: 'New Delhi', address: 'Ansari Nagar East, New Delhi', phone: '011-2658-8500', beds: 2478, hasBloodBank: true, verified: true, location: coord('New Delhi'),
-    inventory: [{ bloodType: 'O+', units: 203 }, { bloodType: 'O-', units: 34 }, { bloodType: 'A+', units: 124 }, { bloodType: 'A-', units: 12 }, { bloodType: 'B+', units: 89 }, { bloodType: 'B-', units: 8 }, { bloodType: 'AB+', units: 56 }, { bloodType: 'AB-', units: 6 }] },
-  { name: 'Kokilaben Dhirubhai Ambani Hospital', city: 'Mumbai', address: 'Four Bunglows, Andheri West, Mumbai', phone: '022-3066-1234', beds: 750, hasBloodBank: true, verified: true, location: coord('Mumbai'),
-    inventory: [{ bloodType: 'O+', units: 156 }, { bloodType: 'O-', units: 22 }, { bloodType: 'A+', units: 98 }, { bloodType: 'B+', units: 110 }, { bloodType: 'B-', units: 4 }, { bloodType: 'AB+', units: 40 }] },
-  { name: 'Manipal Hospital', city: 'Bangalore', address: 'HAL Airport Road, Bangalore', phone: '080-2502-4444', beds: 600, hasBloodBank: true, verified: true, location: coord('Bangalore'),
-    inventory: [{ bloodType: 'O+', units: 134 }, { bloodType: 'O-', units: 18 }, { bloodType: 'A+', units: 76 }, { bloodType: 'A-', units: 5 }, { bloodType: 'B+', units: 92 }, { bloodType: 'AB+', units: 33 }] },
-  { name: 'Apollo Hospitals', city: 'Chennai', address: 'Greams Road, Chennai', phone: '044-2829-3333', beds: 560, hasBloodBank: true, verified: true, location: coord('Chennai'),
-    inventory: [{ bloodType: 'O+', units: 142 }, { bloodType: 'A+', units: 88 }, { bloodType: 'A-', units: 14 }, { bloodType: 'B+', units: 70 }, { bloodType: 'AB+', units: 28 }, { bloodType: 'AB-', units: 9 }] },
-  { name: 'Ruby Hall Clinic', city: 'Pune', address: 'Sassoon Road, Pune', phone: '020-6645-5100', beds: 750, hasBloodBank: true, verified: true, location: coord('Pune'),
-    inventory: [{ bloodType: 'O+', units: 96 }, { bloodType: 'O-', units: 11 }, { bloodType: 'B+', units: 64 }, { bloodType: 'B-', units: 6 }, { bloodType: 'A+', units: 52 }] },
-  { name: 'Bombay Hospital', city: 'Indore', address: 'Ring Road, Indore', phone: '0731-255-8866', beds: 700, hasBloodBank: true, verified: true, location: coord('Indore'),
-    inventory: [{ bloodType: 'O+', units: 78 }, { bloodType: 'A+', units: 44 }, { bloodType: 'B+', units: 58 }, { bloodType: 'AB+', units: 19 }, { bloodType: 'AB-', units: 3 }] },
-];
-
-export const seedEmergencies = [
-  { bloodType: 'O-', units: 4, urgency: 'critical', hospital: 'AIIMS New Delhi', city: 'Delhi', ward: 'Trauma ICU', contactName: 'Dr. S. Rao', contactPhone: '+91 98100 00001', patientAge: 34, patientGender: 'Male', reason: 'Road accident trauma surgery, severe blood loss, immediate transfusion required.', status: 'open' },
-  { bloodType: 'B-', units: 2, urgency: 'urgent', hospital: 'Kokilaben Hospital', city: 'Mumbai', ward: 'Maternity', contactName: 'Nurse Latha', contactPhone: '+91 98200 00002', patientAge: 28, patientGender: 'Female', reason: 'Post-partum hemorrhage, mother stable but requires backup units.', status: 'open' },
-  { bloodType: 'AB-', units: 1, urgency: 'moderate', hospital: 'Manipal Hospital', city: 'Bangalore', ward: 'Oncology', contactName: 'Dr. Pillai', contactPhone: '+91 98300 00003', patientAge: 61, patientGender: 'Male', reason: 'Chemotherapy support transfusion scheduled for tomorrow morning.', status: 'open' },
-];
+export const seedEmergencies = buildEmergencies();

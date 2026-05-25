@@ -236,3 +236,51 @@ export function triageRequest(request = {}) {
 
   return { priorityScore: score, triageLabel: label, triageReasons: reasons, engine: 'rules' };
 }
+
+/* ── Emergency description writer (rule fallback) ───────────────────────────
+ * Builds a clean, professional one-liner from the structured fields. The LLM
+ * adapters override this with a richer, natural-language version.
+ */
+export function writeEmergencyDescription(d = {}) {
+  const parts = [];
+  if (d.units && d.bloodType) parts.push(`${d.units} unit(s) of ${d.bloodType} blood required`);
+  if (d.hospital) parts.push(`at ${d.hospital}`);
+  if (d.ward) parts.push(`(${d.ward})`);
+  if (d.patientAge) parts.push(`for a ${d.patientAge}-year-old patient`);
+  if (d.reason) parts.push(`— ${d.reason}`);
+  if (d.urgency) parts.push(`. Urgency: ${d.urgency}.`);
+  const text = parts.join(' ').replace(' .', '.').trim();
+  return { description: text || 'Urgent blood requirement. Please respond if you can help.', engine: 'rules' };
+}
+
+/* ── Donor outreach message writer (rule fallback) ──────────────────────────*/
+export function writeOutreachMessage(donor = {}, request = {}) {
+  const name = donor.name ? donor.name.split(' ')[0] : 'there';
+  const bt = request.bloodType || 'blood';
+  const place = request.hospital || request.city || 'a nearby hospital';
+  const msg =
+    `Hi ${name}, this is an urgent request via RaktSetu. ` +
+    `${bt} blood is needed at ${place}. ` +
+    `Your blood type is a match. If you're available to donate, please respond as soon as you can. ` +
+    `Every minute counts — thank you for being a lifesaver. 🩸`;
+  return { message: msg, engine: 'rules' };
+}
+
+/* ── Conversational eligibility (rule fallback) ─────────────────────────────
+ * Without an LLM we can't truly parse free text, so we return a friendly
+ * prompt asking the user to use the form, plus a couple of keyword hints.
+ */
+export function eligibilityChat(message = '', _history = []) {
+  const m = String(message).toLowerCase();
+  const hints = [];
+  if (/(fever|cold|flu|ill|sick|infection)/.test(m)) hints.push('Recent illness usually means waiting until you are fully recovered (often ~2 weeks).');
+  if (/(tattoo|piercing)/.test(m)) hints.push('A recent tattoo or piercing typically defers donation for up to 6 months.');
+  if (/(pregnan|delivery|deliver)/.test(m)) hints.push('Pregnancy and recent delivery defer donation until cleared by a doctor.');
+  if (/(alcohol|drink|drunk)/.test(m)) hints.push('Avoid donating within 24 hours of drinking alcohol.');
+  if (/(weight|kg)/.test(m)) hints.push('Donors usually need to weigh at least 50 kg.');
+  if (/(age|years old|year old)/.test(m)) hints.push('Eligible age is generally 18–65.');
+  const base = hints.length
+    ? hints.join(' ')
+    : 'I can help check your eligibility. For a precise result, try the form, or tell me your age, weight, last donation date, and any recent illness, tattoo, surgery, pregnancy, or medication.';
+  return { answer: `${base} (Informational only — not medical advice.)`, engine: 'rules' };
+}
