@@ -25,7 +25,7 @@ import * as rules from './engines/rulesEngine.js';
 import * as chatRag from './engines/chatRagEngine.js';
 // LLM adapters are imported lazily so the app runs with zero AI deps installed.
 
-const MODE = env.AI_MODE; // 'rules' | 'openai' | 'gemini'
+const MODE = env.AI_MODE; // 'rules' | 'openai' | 'gemini' | 'groq'
 
 let llmAdapter = null;
 async function getLLM() {
@@ -34,6 +34,8 @@ async function getLLM() {
     llmAdapter = await import('./engines/openaiEngine.js');
   } else if (MODE === 'gemini') {
     llmAdapter = await import('./engines/geminiEngine.js');
+  } else if (MODE === 'groq') {
+    llmAdapter = await import('./engines/groqEngine.js');
   }
   return llmAdapter;
 }
