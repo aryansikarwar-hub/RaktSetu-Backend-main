@@ -34,7 +34,7 @@ export const matchAdhoc = asyncHandler(async (req, res) => {
 
 /** GET /api/ai/status — report which AI engine is active. */
 export const status = asyncHandler(async (_req, res) => {
-  res.json({ success: true, mode: ai.mode, features: ['match', 'eligibility', 'forecast', 'triage', 'chat'] });
+  res.json({ success: true, mode: ai.mode, features: ['match', 'eligibility', 'forecast', 'triage', 'chat', 'describe-emergency', 'outreach'] });
 });
 
 /** GET /api/ai/chat/suggestions — starter questions for the chatbot. */
@@ -62,5 +62,28 @@ export const chat = asyncHandler(async (req, res) => {
   };
 
   const result = await ai.chat(String(message).slice(0, 500), { live, history: history || [] });
+  res.json({ success: true, ...result });
+});
+
+/** POST /api/ai/describe-emergency — AI writes a professional description. */
+export const describeEmergency = asyncHandler(async (req, res) => {
+  const result = await ai.writeEmergencyDescription(req.body || {});
+  res.json({ success: true, ...result });
+});
+
+/** POST /api/ai/outreach — AI writes a personalized donor outreach message. */
+export const outreachMessage = asyncHandler(async (req, res) => {
+  const { donor = {}, request = {} } = req.body || {};
+  const result = await ai.writeOutreachMessage(donor, request);
+  res.json({ success: true, ...result });
+});
+
+/** POST /api/ai/eligibility-chat — conversational eligibility assistant. */
+export const eligibilityChat = asyncHandler(async (req, res) => {
+  const { message, history } = req.body || {};
+  if (!message || !String(message).trim()) {
+    return res.status(400).json({ success: false, error: 'Message is required' });
+  }
+  const result = await ai.eligibilityChat(String(message).slice(0, 500), history || []);
   res.json({ success: true, ...result });
 });

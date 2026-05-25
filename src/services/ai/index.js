@@ -79,6 +79,18 @@ export const ai = {
   /** RAG chatbot — grounded answer from knowledge base + live data. */
   chat: (question, context) =>
     withFallback('chat', chatRag.chat, question, context),
+
+  /** Write a professional emergency description from basic fields (LLM). */
+  writeEmergencyDescription: (details) =>
+    withFallback('writeEmergencyDescription', rules.writeEmergencyDescription, details),
+
+  /** Write a personalized donor outreach message for an emergency (LLM). */
+  writeOutreachMessage: (donor, request) =>
+    withFallback('writeOutreachMessage', rules.writeOutreachMessage, donor, request),
+
+  /** Conversational eligibility — understands free-text health descriptions. */
+  eligibilityChat: (message, history) =>
+    withFallback('eligibilityChat', rules.eligibilityChat, message, history),
 };
 
 logger.info(`AI layer initialised in "${MODE}" mode.`);
