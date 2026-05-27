@@ -34,6 +34,33 @@ export function initMockStore() {
       expiresAt: new Date(Date.now() + 6 * 3600000),
     };
   });
+
+  // Seed a few donation records per donor, derived from their profile, so the
+  // "My Donations" page shows realistic history even in mock mode.
+  const HOSPITALS = ['AIIMS', 'Apollo Hospital', 'Fortis Hospital', 'Kokilaben Hospital', 'Manipal Hospital'];
+  const TYPES = ['Whole Blood', 'Platelets', 'Plasma'];
+  store.donations = [];
+  store.users
+    .filter((u) => u.role === 'donor')
+    .forEach((u) => {
+      const total = u.totalDonations || 3;
+      const last = u.lastDonation ? new Date(u.lastDonation) : new Date();
+      for (let i = 0; i < total; i++) {
+        const d = new Date(last);
+        d.setDate(d.getDate() - i * 92);
+        store.donations.push({
+          _id: nextId(),
+          donor: u._id,
+          hospital: `${HOSPITALS[i % HOSPITALS.length]}, ${u.city || 'Mumbai'}`,
+          city: u.city || 'Mumbai',
+          bloodType: u.bloodType || 'O+',
+          units: 1,
+          donationType: TYPES[i % TYPES.length],
+          pointsAwarded: 50,
+          date: d,
+        });
+      }
+    });
 }
 
 export const mock = {
@@ -62,6 +89,10 @@ export const mock = {
     if (u) Object.assign(u, patch);
     return u;
   },
+  listDonationsByDonor: (donorId) =>
+    store.donations
+      .filter((d) => d.donor === donorId)
+      .sort((a, b) => b.date - a.date),
   listHospitals: (city) => (city ? store.hospitals.filter((h) => h.city === city) : store.hospitals),
   findHospitalById: (id) => store.hospitals.find((h) => h._id === id),
   listEmergencies: (filter = {}) => {

@@ -10,6 +10,7 @@ import User from '../models/User.js';
 import Hospital from '../models/Hospital.js';
 import EmergencyRequest from '../models/EmergencyRequest.js';
 import Notification from '../models/Notification.js';
+import Donation from '../models/Donation.js';
 
 const MOCK = env.USE_MOCK;
 
@@ -44,6 +45,12 @@ export const repo = {
   async updateUser(id, patch) {
     if (MOCK) return mock.updateUser(id, patch);
     return User.findByIdAndUpdate(id, patch, { new: true }).exec();
+  },
+
+  /* ── Donations ── */
+  async listDonationsByDonor(donorId) {
+    if (MOCK) return mock.listDonationsByDonor(donorId);
+    return Donation.find({ donor: donorId }).sort({ date: -1 }).limit(100).lean().exec();
   },
 
   /* ── Hospitals ── */

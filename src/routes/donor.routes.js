@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { query, param, body } from 'express-validator';
-import { searchDonors, myEligibility, updateMe, compatibility } from '../controllers/donorController.js';
+import { searchDonors, myEligibility, myDonations, updateMe, compatibility } from '../controllers/donorController.js';
 import { protect } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { BLOOD_TYPES } from '../utils/bloodLogic.js';
@@ -27,6 +27,9 @@ router.get(
 );
 
 router.get('/eligibility', protect, myEligibility);
+
+// Donation history for the logged-in donor.
+router.get('/me/donations', protect, myDonations);
 
 router.patch(
   '/me',
