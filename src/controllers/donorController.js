@@ -43,6 +43,25 @@ export const myEligibility = asyncHandler(async (req, res) => {
   res.json({ success: true, ...elig, lastDonation: user.lastDonation });
 });
 
+/** GET /api/donors/me/donations — donation history for the logged-in donor. */
+export const myDonations = asyncHandler(async (req, res) => {
+  const donorId = req.user._id || req.user.id;
+  const docs = await repo.listDonationsByDonor(donorId);
+
+  const donations = docs.map((d) => ({
+    id: String(d._id),
+    date: d.date,
+    hospital: d.hospital || '—',
+    city: d.city || '—',
+    bloodType: d.bloodType,
+    units: d.units ?? 1,
+    donationType: d.donationType || 'Whole Blood',
+    pointsAwarded: d.pointsAwarded ?? 0,
+  }));
+
+  res.json({ success: true, count: donations.length, donations });
+});
+
 /** PATCH /api/donors/me — update availability / profile basics. */
 export const updateMe = asyncHandler(async (req, res) => {
   const allowed = ['available', 'city', 'phone', 'donorStatus'];
