@@ -22,6 +22,19 @@ export const env = {
   GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
   GROQ_API_KEY: process.env.GROQ_API_KEY || '',
   GROQ_MODEL: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+  // Communications
+  ENABLE_SMS: bool(process.env.ENABLE_SMS, false),
+  TWILIO_SID: process.env.TWILIO_SID || '',
+  TWILIO_TOKEN: process.env.TWILIO_TOKEN || '',
+  TWILIO_WHATSAPP_FROM: process.env.TWILIO_WHATSAPP_FROM || '',
+  TWILIO_FROM: process.env.TWILIO_FROM || '',
+  ENABLE_EMAIL: bool(process.env.ENABLE_EMAIL, false),
+  SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || '',
+  EMAIL_FROM: process.env.EMAIL_FROM || '',
+  ENABLE_SEND_QUEUE: bool(process.env.ENABLE_SEND_QUEUE, false),
+  // Redis for OTP and other ephemeral stores
+  USE_REDIS_OTP: bool(process.env.USE_REDIS_OTP, false),
+  REDIS_URL: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
 };
 
 export const isProd = env.NODE_ENV === 'production';

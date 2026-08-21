@@ -1,5 +1,6 @@
 import { repo } from '../services/repository.js';
 import { asyncHandler } from '../middleware/error.js';
+import { restrictTo } from '../middleware/auth.js';
 
 /** GET /api/hospitals — list partner hospitals (optionally by city). */
 export const listHospitals = asyncHandler(async (req, res) => {
@@ -29,4 +30,13 @@ export const aggregateInventory = asyncHandler(async (req, res) => {
     return { bloodType, units, status };
   });
   res.json({ success: true, inventory });
+});
+
+/** PUT /api/hospitals/:id/inventory — replace inventory for a hospital (protected) */
+export const updateInventory = asyncHandler(async (req, res) => {
+  const hospitalId = req.params.id;
+  const inventory = Array.isArray(req.body.inventory) ? req.body.inventory : [];
+  const updated = await repo.updateHospitalInventory(hospitalId, inventory);
+  if (!updated) return res.status(404).json({ success: false, message: 'Hospital not found' });
+  res.json({ success: true, hospital: updated });
 });

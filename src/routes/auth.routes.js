@@ -16,8 +16,10 @@ router.post(
       .matches(/[A-Za-z]/).withMessage('Password must contain a letter')
       .matches(/\d/).withMessage('Password must contain a number'),
     body('role').optional().isIn(['donor', 'hospital', 'admin']).withMessage('Invalid role'),
-    body('phone').optional({ checkFalsy: true })
-      .matches(/^[+\d][\d\s-]{8,14}$/).withMessage('Enter a valid phone number'),
+    body('phone').trim().notEmpty().withMessage('Mobile number is required')
+      // Strip spaces/dashes before checking so "+91 98765 43210" and "9876543210" both pass.
+      .customSanitizer((v) => String(v).replace(/[^\d+]/g, ''))
+      .matches(/^(?:\+?91|0)?[6-9]\d{9}$/).withMessage('Enter a valid 10-digit mobile number'),
     body('city').trim().notEmpty().withMessage('City is required'),
     // Donor-only
     body('bloodType').if(body('role').not().equals('hospital')).if(body('role').not().equals('admin'))
