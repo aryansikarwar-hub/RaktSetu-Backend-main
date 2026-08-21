@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { query, param } from 'express-validator';
-import { listHospitals, getHospital, aggregateInventory } from '../controllers/hospitalController.js';
+import { query, param, body } from 'express-validator';
+import { listHospitals, getHospital, aggregateInventory, updateInventory } from '../controllers/hospitalController.js';
 import { validate } from '../middleware/validate.js';
+import { protect, restrictTo } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -24,6 +25,15 @@ router.get(
   [param('id').isString().trim().notEmpty().withMessage('Hospital id required')],
   validate,
   getHospital
+);
+
+router.put(
+  '/:id/inventory',
+  protect,
+  restrictTo('hospital', 'admin'),
+  [param('id').isString().trim().notEmpty(), body('inventory').isArray().withMessage('inventory array required')],
+  validate,
+  updateInventory
 );
 
 export default router;

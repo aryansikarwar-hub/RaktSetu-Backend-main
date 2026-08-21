@@ -4,6 +4,8 @@ import { repo, safeUser } from '../services/repository.js';
 import { signToken } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/error.js';
 import { cityCoords } from '../utils/geo.js';
+import { createOtp, verifyOtp } from '../services/otpStore.js';
+import { sendSms, sendEmail } from '../services/comm.js';
 
 function checkValidation(req, res) {
   const errors = validationResult(req);
@@ -65,4 +67,40 @@ export const login = asyncHandler(async (req, res) => {
 
 export const me = asyncHandler(async (req, res) => {
   res.json({ success: true, user: req.user });
+});
+
+// Send a numeric OTP to a phone number or email for login.
+export const sendOtp = asyncHandler(async (req, res) => {
+  const { to } = req.body || {};
+  if (!to) return res.status(400).json({ success: false, message: 'to is required' });
+
+  const isEmail = String(to || '').includes('@');
+  const user = isEmail ? await repo.findUserByEmail(to) : await repo.findUserByPhone(to);
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+  // generate 6-digit OTP
+  const code = Math.floor(100000 + Math.random() * 900000);
+  const created = createOtp(to, { code, ttl: 300, userId: String(user._id || user.id) });
+  if (!created || created.ok === false) {
+    return res.status(429).json({ success: false, message: 'Rate limit exceeded. Try again later.' });
+  }
+
+  if (isEmail) {
+    await sendEmail(to, 'Your RaktSetu login code', `Your one-time code is: ${code}`);
+  } else {
+    await sendSms(to, `Your RaktSetu login code: ${code}`);
+  }
+
+  return res.json({ success: true, message: 'OTP sent' });
+});
+
+export const verifyOtpAndLogin = asyncHandler(async (req, res) => {
+  const { to, code } = req.body || {};
+  if (!to || !code) return res.status(400).json({ success: false, message: 'to and code are required' });
+  const v = verifyOtp(to, code);
+  if (!v.ok) return res.status(400).json({ success: false, message: `OTP ${v.reason}` });
+  const user = await repo.findUserById(v.userId);
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+  const token = signToken(user);
+  return res.json({ success: true, token, user: safeUser(user) });
 });

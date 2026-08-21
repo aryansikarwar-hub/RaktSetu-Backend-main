@@ -60,11 +60,22 @@ export function initMockStore() {
           date: d,
         });
       }
+
+      // simple bookings
+      store.bookings = [];
     });
+
+  // Comm templates
+  store.templates = [
+    { _id: nextId(), name: 'Emergency SMS', channel: 'sms', subject: '', body: 'Hi {{name}}, {{units}} unit(s) of {{bloodType}} needed at {{hospital}}. Reply if you can help.', default: true, createdAt: new Date() },
+    { _id: nextId(), name: 'Emergency Email', channel: 'email', subject: 'Urgent: {{units}} {{bloodType}} needed', body: 'Dear {{name}},\n\nWe urgently need {{units}} unit(s) of {{bloodType}} at {{hospital}}. Please respond if available.\n', default: true, createdAt: new Date() },
+  ];
+  store.audits = [];
 }
 
 export const mock = {
   findUserByEmail: (email) => store.users.find((u) => u.email === email.toLowerCase()),
+  findUserByPhone: (phone) => store.users.find((u) => u.phone === phone),
   findUserById: (id) => store.users.find((u) => u._id === id),
   createUser: (data) => {
     const user = {
@@ -115,7 +126,73 @@ export const mock = {
     if (e) Object.assign(e, patch);
     return e;
   },
+  createBooking: (data) => {
+    const b = { ...data, _id: nextId(), createdAt: new Date(), status: 'booked' };
+    store.bookings.push(b);
+    return b;
+  },
+  updateHospitalInventory: (hospitalId, inventory) => {
+    const h = store.hospitals.find((x) => x._id === hospitalId);
+    if (!h) return null;
+    h.inventory = inventory;
+    return h;
+  },
+  listBookingsForHospital: (hospitalId) => store.bookings.filter((b) => b.hospital === hospitalId).sort((a,b)=>a.slotAt-b.slotAt),
+  listBookingsForDonor: (donorId) => store.bookings.filter((b) => b.donor === donorId).sort((a,b)=>b.slotAt-a.slotAt),
+  updateBooking: (id, patch) => { const b = store.bookings.find((x)=>x._id===id); if (b) Object.assign(b, patch); return b; },
   listNotifications: (userId) => store.notifications.filter((n) => !userId || n.user === userId).slice(0, 20),
+  createNotification: (userId, data) => {
+    const n = { _id: nextId(), user: userId, ...data, read: false, createdAt: new Date() };
+    store.notifications.unshift(n);
+    return n;
+  },
+  updateNotificationRead: (id, read = true) => {
+    const n = store.notifications.find((x) => x._id === id);
+    if (n) { n.read = !!read; }
+    return n;
+  },
+  listCommTemplates: (filter = {}) => {
+    let out = store.templates.slice(0);
+    if (filter.channel) out = out.filter((t) => t.channel === filter.channel);
+    if (filter.name) out = out.filter((t) => new RegExp(filter.name, 'i').test(t.name));
+    const page = parseInt(filter.page || '1', 10) || 1;
+    const limit = Math.min(parseInt(filter.limit || '20', 10) || 20, 200);
+    const skip = (page - 1) * limit;
+    return out.slice(skip, skip + limit);
+  },
+  countCommTemplates: (filter = {}) => {
+    let out = store.templates.slice(0);
+    if (filter.channel) out = out.filter((t) => t.channel === filter.channel);
+    if (filter.name) out = out.filter((t) => new RegExp(filter.name, 'i').test(t.name));
+    return out.length;
+  },
+  findCommTemplateById: (id) => store.templates.find((t) => t._id === id),
+  createCommTemplate: (data) => { const t = { _id: nextId(), ...data, createdAt: new Date() }; store.templates.unshift(t); return t; },
+  updateCommTemplate: (id, patch) => { const t = store.templates.find((x) => x._id === id); if (t) Object.assign(t, patch); return t; },
+  deleteCommTemplate: (id) => { const idx = store.templates.findIndex((x) => x._id === id); if (idx === -1) return false; store.templates.splice(idx, 1); return true; },
+  createAuditLog: (payload) => { const a = { _id: nextId(), ...payload, createdAt: new Date() }; store.audits.unshift(a); return a; },
+  listAuditLogs: (filter = {}) => {
+    let out = store.audits.slice(0);
+    if (filter.target) out = out.filter((a) => a.target === filter.target);
+    if (filter.targetId) out = out.filter((a) => a.targetId === filter.targetId);
+    const page = parseInt(filter.page || '1', 10) || 1;
+    const limit = Math.min(parseInt(filter.limit || '20', 10) || 20, 200);
+    const skip = (page - 1) * limit;
+    return out.slice(skip, skip + limit);
+  },
+  listAdmins: () => store.users.filter((u) => ['admin', 'coordinator'].includes(u.role)),
+  createCommJob: (payload) => { const j = { _id: nextId(), attempts: 0, maxAttempts: 5, status: 'pending', nextAttemptAt: new Date(), ...payload, createdAt: new Date() }; store.jobs = store.jobs || []; store.jobs.unshift(j); return j; },
+  fetchPendingCommJobs: (limit = 20) => { store.jobs = store.jobs || []; const now = new Date(); return store.jobs.filter((j) => j.status === 'pending' && new Date(j.nextAttemptAt) <= now).slice(0, limit); },
+  markCommJob: (id, patch) => { store.jobs = store.jobs || []; const j = store.jobs.find((x) => x._id === id); if (j) Object.assign(j, patch); return j; },
+  listCommJobs: (filter = {}) => {
+    store.jobs = store.jobs || [];
+    let out = store.jobs.slice(0);
+    if (filter.status) out = out.filter((j) => j.status === filter.status);
+    const page = parseInt(filter.page || '1', 10) || 1;
+    const limit = Math.min(parseInt(filter.limit || '20', 10) || 20, 200);
+    const skip = (page - 1) * limit;
+    return out.slice(skip, skip + limit);
+  },
   stats: () => ({
     donors: store.users.filter((u) => u.role === 'donor').length,
     hospitals: store.hospitals.length,
